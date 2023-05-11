@@ -1,52 +1,56 @@
-from flask import Flask, render_template, request, redirect, url_for
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, request, render_template
+import mysql.connector
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:senha@db/meu_banco'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
 
+# Configurações do banco de dados
+db = mysql.connector.connect(
+  host="db",
+  user="root",
+  password="senha",
+  database="meu_banco"
+)
 
-class Pessoa(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(255), nullable=False)
-    idade = db.Column(db.Integer, nullable=False)
-
-
+# Rota principal que exibe o formulário para adicionar uma pessoa
 @app.route('/')
 def index():
-    pessoas = Pessoa.query.all()
-    return render_template('form.html', pessoas=pessoas)
+    return render_template('form.html')
 
-
-@app.route('/create', methods=['POST'])
-def create():
+# Rota que adiciona uma pessoa ao banco de dados
+@app.route('/add', methods=['POST'])
+def add_person():
+    cursor = db.cursor()
     nome = request.form['nome']
     idade = request.form['idade']
-    pessoa = Pessoa(nome=nome, idade=idade)
-    db.session.add(pessoa)
-    db.session.commit()
-    return redirect(url_for('index'))
+    sql = "INSERT INTO pessoas (nome, idade) VALUES (%s, %s)"
+    val = (nome, idade)
+    cursor.execute(sql, val)
+    db.commit()
+    return 'Registro inserido com sucesso!'
 
+# Rota que atualiza uma pessoa no banco de dados
+@app.route('/update', methods=['POST'])
+def update_person():
+    cursor = db.cursor()
+    nome = request.form['nome']
+    idade = request.form['idade']
+    id = request.form['id']
+    sql = "UPDATE pessoas SET nome = %s, idade = %s WHERE id = %s"
+    val = (nome, idade, id)
+    cursor.execute(sql, val)
+    db.commit()
+    return 'Registro atualizado com sucesso!'
 
-@app.route('/edit/<int:id>', methods=['GET', 'POST'])
-def edit(id):
-    pessoa = Pessoa.query.get(id)
-    if request.method == 'POST':
-        pessoa.nome = request.form['nome']
-        pessoa.idade = request.form['idade']
-        db.session.commit()
-        return redirect(url_for('index'))
-    return render_template('edit.html', pessoa=pessoa)
-
-
-@app.route('/delete/<int:id>')
-def delete(id):
-    pessoa = Pessoa.query.get(id)
-    db.session.delete(pessoa)
-    db.session.commit()
-    return redirect(url_for('index'))
-
+# Rota que remove uma pessoa do banco de dados
+@app.route('/delete', methods=['POST'])
+def delete_person():
+    cursor = db.cursor()
+    id = request.form['id']
+    sql = "DELETE FROM pessoas WHERE id = %s"
+    val = (id,)
+    cursor.execute(sql, val)
+    db.commit()
+    return 'Registro removido com sucesso!'
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(debug=True, host='0.0.0.0')
